@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Fluid Simulation</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="header">
+        <h1>Fluid Simulation</h1>
+        <p>Interactive 2D water particle simulation with realistic physics</p>
+    </div>
+    
+    <div class="controls">
+        <button class="btn" onclick="clearCanvas()">Clear Canvas</button>
+    </div>
+    
+    <div class="simulation-container">
+        <div class="canvas-container">
+            <canvas id="canvas" width="800px" height="600px"></canvas>
+        </div>
+        
+        <div class="controls-panel">
+            <h3>Simulation Controls</h3>
+            
+            <div class="slider-group">
+                <label for="restDensity">Rest Density</label>
+                <input type="range" id="restDensity" min="5" max="50" value="10" step="1">
+                <span class="value-display" id="restDensityValue">10</span>
+            </div>
+            
+            <div class="slider-group">
+                <label for="velocityDampening">Velocity Dampening</label>
+                <input type="range" id="velocityDampening" min="0.8" max="1.0" value="0.99" step="0.01">
+                <span class="value-display" id="velocityDampeningValue">0.99</span>
+            </div>
+            
+            <div class="slider-group">
+                <label for="particlesPerFrame">Particles Spawn Rate</label>
+                <input type="range" id="particlesPerFrame" min="1" max="50" value="1" step="1">
+                <span class="value-display" id="particlesPerFrameValue">1</span>
+            </div>
+            
+            <div class="slider-group">
+                <label for="kValue">K (Pressure)</label>
+                <input type="range" id="kValue" min="0.1" max="2.0" value="0.5" step="0.1">
+                <span class="value-display" id="kValueValue">0.5</span>
+            </div>
+            
+            <div class="slider-group">
+                <label for="kNearValue">K Near</label>
+                <input type="range" id="kNearValue" min="1" max="10" value="3" step="1">
+                <span class="value-display" id="kNearValueValue">3</span>
+            </div>
+            
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="viscosityToggle">
+                    <span class="checkmark"></span>
+                    Enable Viscosity
+                </label>
+            </div>
+            
+            <div class="slider-group" id="viscositySliderGroup" style="display: none;">
+                <label for="viscosityStrength">Viscosity Strength</label>
+                <input type="range" id="viscosityStrength" min="0" max="2" value="0.5" step="0.1">
+                <span class="value-display" id="viscosityStrengthValue">0.5</span>
+            </div>
+        </div>
+        
+        </div>
+    </div>
+    
+    <div class="action-buttons">
+        <h3>Actions</h3>
+                    <div class="button-group">
+                <button class="action-btn active" id="waterMode" onclick="setActionMode('water')">
+                    💧 Water
+                </button>
+                <button class="action-btn" id="wallMode" onclick="setActionMode('wall')">
+                    🧱 Wall
+                </button>
+
+                <button class="action-btn" id="mixMode" onclick="setActionMode('mix')">
+                    🔄 Mix
+                </button>
+            </div>
+    </div>
+    
+    <div class="instructions">
+        <h3>How to Use</h3>
+        <ul>
+            <li><strong>Select Action Mode:</strong> Choose between Water, Wall, or Mix</li>
+            <li><strong>Left Click + Drag:</strong> Perform the selected action</li>
+            <li><strong>Adjust Controls:</strong> Use sliders to fine-tune simulation parameters</li>
+            <li><strong>Clear Canvas:</strong> Reset everything to start fresh</li>
+        </ul>
+    </div>
+    <script src="javascript/Playground.js"></script>
+    <script src="javascript/Simulation.js"></script>
+    <script src="javascript/Vector2.js"></script>
+    <script src="javascript/DrawUtils.js"></script>
+    <script src="javascript/Particle.js"></script>
+    <script src="javascript/FluidHashGrid.js"></script>
+    <script src="javascript/Spring.js"></script>
+    <script src="javascript/WallManager.js"></script>
+    <script src="javascript/ParticleMixer.js"></script>
+
+    <script>
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+
+        let lastTime = performance.now();
+        let currentTime = 0;
+        let deltaTime = 0;
+
+        let playground = new Playground();
+
+        mainLoop();
+
+        function updatePlayground(dt){
+            Clear();
+            playground.update(dt);
+            playground.draw();
+        }
+
+        function mainLoop(){
+            window.requestAnimationFrame(mainLoop);
+
+            currentTime = performance.now();
+            deltaTime = (currentTime - lastTime) / 1000;
+
+            updatePlayground(deltaTime);
+            lastTime = currentTime;
+        }
+
+        function Clear(){
+            ctx.fillStyle = "#242321";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function getMousePos(canvas, evt) {
+            var rect = canvas.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
+            };
+        }
+
+        canvas.addEventListener('mousemove', function(evt) {
+            let mousePos = getMousePos(canvas, evt);
+            playground.onMouseMove(new Vector2(mousePos.x, mousePos.y));
+        }, false);
+
+        canvas.addEventListener('mousedown', function(evt) {
+            playground.onMouseDown(evt.button);
+        }, false);
+
+        canvas.addEventListener('mouseup', function(evt) {
+            playground.onMouseUp(evt.button);
+        }, false);
+
+        canvas.addEventListener('contextmenu', function(evt) {
+            evt.preventDefault(); // Prevent right-click menu for wall drawing
+        }, false);
+
+        function clearCanvas() {
+            playground.reset();
+        }
+
+        // Slider functionality
+        function setupSliders() {
+            const sliders = {
+                'restDensity': 'REST_DENSITY',
+                'velocityDampening': 'VELOCITY_DAMPENING',
+                'particlesPerFrame': 'PARTICLES_PER_FRAME',
+                'kValue': 'K',
+                'kNearValue': 'K_NEAR',
+                'viscosityStrength': 'SIGMA'
+            };
+
+            Object.keys(sliders).forEach(sliderId => {
+                const slider = document.getElementById(sliderId);
+                const valueDisplay = document.getElementById(sliderId + 'Value');
+                const simulationProperty = sliders[sliderId];
+
+                if (slider) {
+                    slider.addEventListener('input', function() {
+                        const value = parseFloat(this.value);
+                        valueDisplay.textContent = value;
+                        
+                        // Update simulation value
+                        if (playground && playground.simulation) {
+                            playground.simulation[simulationProperty] = value;
+                        }
+                    });
+                }
+            });
+
+            // Viscosity toggle functionality
+            const viscosityToggle = document.getElementById('viscosityToggle');
+            const viscositySliderGroup = document.getElementById('viscositySliderGroup');
+            const viscosityStrengthSlider = document.getElementById('viscosityStrength');
+
+            if (viscosityToggle) {
+                viscosityToggle.addEventListener('change', function() {
+                    const isEnabled = this.checked;
+                    
+                    // Show/hide viscosity slider
+                    viscositySliderGroup.style.display = isEnabled ? 'block' : 'none';
+                    
+                    // Update simulation viscosity
+                    if (playground && playground.simulation) {
+                        if (isEnabled) {
+                            playground.simulation.SIGMA = parseFloat(viscosityStrengthSlider.value);
+                        } else {
+                            playground.simulation.SIGMA = 0;
+                        }
+                    }
+                });
+            }
+        }
+
+        // Action mode functionality
+        let currentActionMode = 'water'; // Default mode
+
+        function setActionMode(mode) {
+            currentActionMode = mode;
+            
+            // Update button states
+            document.getElementById('waterMode').classList.toggle('active', mode === 'water');
+            document.getElementById('wallMode').classList.toggle('active', mode === 'wall');
+            document.getElementById('mixMode').classList.toggle('active', mode === 'mix');
+            
+            // Update playground mode
+            if (playground) {
+                playground.setActionMode(mode);
+            }
+        }
+
+        // Initialize sliders when page loads
+        window.addEventListener('load', function() {
+            setupSliders();
+        });
+
+    </script>
+
+</body>
+</html>
